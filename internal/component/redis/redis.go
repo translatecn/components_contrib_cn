@@ -25,7 +25,7 @@ func ParseClientFromProperties(properties map[string]string, defaultSettings *Se
 	} else {
 		settings = defaultSettings
 	}
-	err = settings.Decode(properties)
+	err = settings.Decode(properties) // 编码
 	if err != nil {
 		return nil, nil, fmt.Errorf("redis client configuration error: %w", err)
 	}
@@ -36,6 +36,7 @@ func ParseClientFromProperties(properties map[string]string, defaultSettings *Se
 	return newClient(settings), settings, nil
 }
 
+// redis 使用哨兵进行故障转移
 func newFailoverClient(s *Settings) redis.UniversalClient {
 	if s == nil {
 		return nil
@@ -76,6 +77,7 @@ func newFailoverClient(s *Settings) redis.UniversalClient {
 	return redis.NewFailoverClient(opts)
 }
 
+// redis 使用不使用哨兵进行故障转移
 func newClient(s *Settings) redis.UniversalClient {
 	if s == nil {
 		return nil
@@ -136,3 +138,8 @@ func newClient(s *Settings) redis.UniversalClient {
 
 	return redis.NewClient(options)
 }
+// redis.UniversalClient
+// 是一个抽象的客户端，根据所提供的选项
+// 可以连接到集群，或有哨兵支持的故障转移实例
+// 或简单的单实例服务器。这对于测试
+// 集群特定的应用程序。
