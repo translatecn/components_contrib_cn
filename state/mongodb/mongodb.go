@@ -304,7 +304,7 @@ func (m *MongoDB) doTransaction(sessCtx mongo.SessionContext, operations []state
 	return nil
 }
 
-// Query executes a query against store.
+// Query 执行一个针对存储的查询。
 func (m *MongoDB) Query(req *state.QueryRequest) (*state.QueryResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), m.operationTimeout)
 	defer cancel()

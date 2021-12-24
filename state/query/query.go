@@ -33,7 +33,7 @@ type Query struct {
 	Sort    []Sorting              `json:"sort"`
 	Page    Pagination             `json:"page"`
 
-	// derived from Filters
+	// 从Filters衍生的
 	Filter Filter
 }
 
