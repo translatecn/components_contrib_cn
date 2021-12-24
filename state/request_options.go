@@ -27,7 +27,7 @@ func CheckRequestOptions(options interface{}) error {
 			return err
 		}
 	case DeleteStateOption:
-		// no support in golang for multiple condition in type switch, so need to check explicitly
+		// golang不支持类型转换中的多个条件，所以需要明确检查。
 		if err := validateConsistencyOption(o.Consistency); err != nil {
 			return err
 		}

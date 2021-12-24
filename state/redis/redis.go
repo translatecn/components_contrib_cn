@@ -375,11 +375,19 @@ func (r *StateStore) parseConnectedSlaves(res string) int {
 	return 0
 }
 
+// 真正调用的删除操作
 func (r *StateStore) deleteValue(req *state.DeleteRequest) error {
 	if req.ETag == nil {
 		etag := "0"
 		req.ETag = &etag
 	}
+	// 获取 key.version						1 demo etag
+	// if version 不存在| type(version) == dict | version=="etag" | version == "" | etag == ""
+	//  	DEL KEYS[1]
+	// else
+	//		return error(\"failed to delete \" .. KEYS[1])
+	//	end"
+
 	_, err := r.client.Do(r.ctx, "EVAL", delQuery, 1, req.Key, *req.ETag).Result()
 	if err != nil {
 		return state.NewETagError(state.ETagMismatch, err)
@@ -388,7 +396,7 @@ func (r *StateStore) deleteValue(req *state.DeleteRequest) error {
 	return nil
 }
 
-// Delete performs a delete operation.
+// Delete 执行一个删除操作。
 func (r *StateStore) Delete(req *state.DeleteRequest) error {
 	err := state.CheckRequestOptions(req.Options)
 	if err != nil {
@@ -439,6 +447,7 @@ func (r *StateStore) Get(req *state.GetRequest) (*state.GetResponse, error) {
 		ETag: version,
 	}, nil
 }
+
 // 真正在状态存储的方法
 func (r *StateStore) setValue(req *state.SetRequest) error {
 	err := state.CheckRequestOptions(req.Options)
@@ -485,27 +494,29 @@ func (r *StateStore) setValue(req *state.SetRequest) error {
 			return state.NewETagError(state.ETagMismatch, err)
 		}
 
-		return fmt.Errorf("failed to set key %s: %s", req.Key, err)
+		return fmt.Errorf("未能设置键 %s: %s", req.Key, err)
 	}
 
 	if ttl != nil && *ttl > 0 {
 		_, err = r.client.Do(r.ctx, "EXPIRE", req.Key, *ttl).Result()
 		if err != nil {
-			return fmt.Errorf("failed to set key %s ttl: %s", req.Key, err)
+			return fmt.Errorf("未能设置键 %s ttl: %s", req.Key, err)
 		}
 	}
 
 	if ttl != nil && *ttl <= 0 {
 		_, err = r.client.Do(r.ctx, "PERSIST", req.Key).Result()
 		if err != nil {
-			return fmt.Errorf("failed to persist key %s: %s", req.Key, err)
+			return fmt.Errorf("没能持久化键 %s: %s", req.Key, err)
 		}
 	}
-
+	// 强一致性
 	if req.Options.Consistency == state.Strong && r.replicas > 0 {
+		//Redis WAIT 命令阻塞当前客户端，直到所有先前的写入命令成功传输，并且由至少指定数量的副本（slave）确认。在达到指定数量的副本或超时时，该命令将始终返回确认在 WAIT 命令之前发送的写入命令的副本数量。
+		// 副本数，超时时间 毫秒
 		_, err = r.client.Do(r.ctx, "WAIT", r.replicas, 1000).Result()
 		if err != nil {
-			return fmt.Errorf("redis waiting for %v replicas to acknowledge write, err: %s", r.replicas, err.Error())
+			return fmt.Errorf("redis等待 %v 副本确认写入, err: %s", r.replicas, err.Error())
 		}
 	}
 
@@ -581,12 +592,13 @@ func (r *StateStore) getKeyVersion(vals []interface{}) (data string, version *st
 
 	return data, version, nil
 }
+
 // 解析用书set数据  设置的ETAG
 func (r *StateStore) parseETag(req *state.SetRequest) (int, error) {
 	if req.Options.Concurrency == state.LastWrite || req.ETag == nil || *req.ETag == "" { // 最后一次写,没有设置ETAG
 		return 0, nil
 	}
-	ver, err := strconv.Atoi(*req.ETag)// etag 必须是数字型字符串
+	ver, err := strconv.Atoi(*req.ETag) // etag 必须是数字型字符串
 	if err != nil {
 		return -1, state.NewETagError(state.ETagInvalid, err)
 	}

@@ -19,7 +19,7 @@ type GetStateOption struct {
 	Consistency string `json:"consistency"` // "eventual, strong"
 }
 
-// DeleteRequest is the object describing a delete state request.
+// DeleteRequest 是描述一个删除状态请求的对象。
 type DeleteRequest struct {
 	Key      string            `json:"key"`
 	ETag     *string           `json:"etag,omitempty"`
