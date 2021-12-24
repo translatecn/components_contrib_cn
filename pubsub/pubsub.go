@@ -7,7 +7,7 @@ package pubsub
 
 import "context"
 
-// PubSub is the interface for message buses.
+// PubSub 是消息总线的接口。
 type PubSub interface {
 	Init(metadata Metadata) error
 	Features() []Feature
@@ -16,5 +16,5 @@ type PubSub interface {
 	Close() error
 }
 
-// Handler is the handler used to invoke the app handler.
+// Handler 是用于调用应用程序处理程序的处理程序。
 type Handler func(ctx context.Context, msg *NewMessage) error

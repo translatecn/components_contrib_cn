@@ -29,12 +29,12 @@ const (
 	maxLenApprox      = "maxLenApprox"
 )
 
-// redisStreams handles consuming from a Redis stream using
-// `XREADGROUP` for reading new messages and `XPENDING` and
-// `XCLAIM` for redelivering messages that previously failed.
+// redisStreams 处理从Redis流中的消费，使用
+// `XREADGROUP`用于读取新消息，`XPENDING`和
+// `XCLAIM`用于重新发送之前失败的消息。
 //
-// See https://redis.io/topics/streams-intro for more information
-// on the mechanics of Redis Streams.
+// 参见 https://redis.io/topics/streams-intro 了解更多信息
+// 关于Redis流的机制。
 type redisStreams struct {
 	metadata       metadata
 	client         redis.UniversalClient
@@ -47,21 +47,19 @@ type redisStreams struct {
 	cancel context.CancelFunc
 }
 
-// redisMessageWrapper encapsulates the message identifier,
-// pubsub message, and handler to send to the queue channel for processing.
+// redisMessageWrapper 封装了消息标识符、pubsub消息和处理程序，以发送到队列通道进行处理。
 type redisMessageWrapper struct {
 	messageID string
 	message   pubsub.NewMessage
 	handler   pubsub.Handler
 }
 
-// NewRedisStreams returns a new redis streams pub-sub implementation.
+// NewRedisStreams 返回一个新的redis流pub-sub实现。
 func NewRedisStreams(logger logger.Logger) pubsub.PubSub {
 	return &redisStreams{logger: logger}
 }
 
 func parseRedisMetadata(meta pubsub.Metadata) (metadata, error) {
-	// Default values
 	m := metadata{
 		processingTimeout: 60 * time.Second,
 		redeliverInterval: 15 * time.Second,
@@ -123,7 +121,7 @@ func parseRedisMetadata(meta pubsub.Metadata) (metadata, error) {
 }
 
 func (r *redisStreams) Init(metadata pubsub.Metadata) error {
-	m, err := parseRedisMetadata(metadata)
+	m, err := parseRedisMetadata(metadata)// 获取到对于Redis有用的配置
 	if err != nil {
 		return err
 	}
@@ -136,7 +134,7 @@ func (r *redisStreams) Init(metadata pubsub.Metadata) error {
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 
 	if _, err = r.client.Ping(r.ctx).Result(); err != nil {
-		return fmt.Errorf("redis streams: error connecting to redis at %s: %s", r.clientSettings.Host, err)
+		return fmt.Errorf("redis streams: 错误连接到redis at %s: %s", r.clientSettings.Host, err)
 	}
 	r.queue = make(chan redisMessageWrapper, int(r.metadata.queueDepth))
 
@@ -216,12 +214,11 @@ func createRedisMessageWrapper(stream string, handler pubsub.Handler, msg redis.
 	}
 }
 
-// worker runs in separate goroutine(s) and pull messages from a channel for processing.
-// The number of workers is controlled by the `concurrency` setting.
+// worker 在独立的goroutine中运行，并从通道中提取消息进行处理。工作者的数量由`concurrency`设置来控制。
 func (r *redisStreams) worker() {
 	for {
 		select {
-		// Handle cancelation
+		// 处理取消的问题
 		case <-r.ctx.Done():
 			return
 

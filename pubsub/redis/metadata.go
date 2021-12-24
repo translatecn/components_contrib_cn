@@ -10,17 +10,17 @@ import (
 )
 
 type metadata struct {
-	// The consumer identifier
+	// 消费者标识符
 	consumerID string
-	// The interval between checking for pending messages to redelivery (0 disables redelivery)
+	// 检查未决信息到重新交付的间隔时间（0禁止重新交付）。
 	redeliverInterval time.Duration
-	// The amount time a message must be pending before attempting to redeliver it (0 disables redelivery)
+	// 在试图重新交付信息之前，信息必须处于等待状态的时间（0禁止重新交付）。
 	processingTimeout time.Duration
-	// The size of the message queue for processing
+	// 用于处理的消息队列的大小
 	queueDepth uint
-	// The number of concurrent workers that are processing messages
+	// 正在处理消息的并发工作者的数量
 	concurrency uint
 
-	// the max len of stream
+	// 流的最大长度
 	maxLenApprox int64
 }

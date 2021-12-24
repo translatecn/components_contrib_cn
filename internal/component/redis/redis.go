@@ -19,6 +19,7 @@ const (
 	NodeType    = "node"
 )
 
+// ParseClientFromProperties 从用户设置的组件中获取配置
 func ParseClientFromProperties(properties map[string]string, defaultSettings *Settings) (client redis.UniversalClient, settings *Settings, err error) {
 	if defaultSettings == nil {
 		settings = &Settings{}
@@ -27,7 +28,7 @@ func ParseClientFromProperties(properties map[string]string, defaultSettings *Se
 	}
 	err = settings.Decode(properties) // 编码
 	if err != nil {
-		return nil, nil, fmt.Errorf("redis client configuration error: %w", err)
+		return nil, nil, fmt.Errorf("Redis客户端配置错误: %w", err)
 	}
 	if settings.Failover {
 		return newFailoverClient(settings), settings, nil
@@ -138,6 +139,7 @@ func newClient(s *Settings) redis.UniversalClient {
 
 	return redis.NewClient(options)
 }
+
 // redis.UniversalClient
 // 是一个抽象的客户端，根据所提供的选项
 // 可以连接到集群，或有哨兵支持的故障转移实例

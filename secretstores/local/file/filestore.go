@@ -251,3 +251,5 @@ func (j *localSecretStore) readLocalFile(secretsFile string) (map[string]interfa
 
 	return jsonConfig, nil
 }
+
+var _ secretstores.SecretStore = &localSecretStore{}
