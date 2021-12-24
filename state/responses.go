@@ -5,7 +5,7 @@
 
 package state
 
-// GetResponse is the response object for getting state.
+// GetResponse 是用于获取状态的响应对象。
 type GetResponse struct {
 	Data     []byte            `json:"data"`
 	ETag     *string           `json:"etag,omitempty"`

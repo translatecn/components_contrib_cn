@@ -406,6 +406,7 @@ func (r *StateStore) Delete(req *state.DeleteRequest) error {
 	return state.DeleteWithOptions(r.deleteValue, req)
 }
 
+// 获取string,现有版本应该是都切到了dict
 func (r *StateStore) directGet(req *state.GetRequest) (*state.GetResponse, error) {
 	res, err := r.client.Do(r.ctx, "GET", req.Key).Result()
 	if err != nil {
@@ -528,7 +529,7 @@ func (r *StateStore) Set(req *state.SetRequest) error {
 	return state.SetWithOptions(r.setValue, req)
 }
 
-// Multi performs a transactional operation. succeeds only if all operations succeed, and fails if one or more operations fail.
+// Multi 执行一个事务性操作。只有当所有的操作都成功时才会成功，如果一个或多个操作失败，则失败。
 func (r *StateStore) Multi(request *state.TransactionalStateRequest) error {
 	pipe := r.client.TxPipeline()
 	for _, o := range request.Operations {
@@ -541,14 +542,14 @@ func (r *StateStore) Multi(request *state.TransactionalStateRequest) error {
 			}
 			ttl, err := r.parseTTL(&req)
 			if err != nil {
-				return fmt.Errorf("failed to parse ttl from metadata: %s", err)
+				return fmt.Errorf("未能从元数据中解析ttl: %s", err)
 			}
-			// apply global TTL
+			// 全局TTL ,声明state store时设置的
 			if ttl == nil {
 				ttl = r.metadata.ttlInSeconds
 			}
 
-			bt, _ := utils.Marshal(req.Value, r.json.Marshal)
+			bt, _ := utils.Marshal(req.Value, r.json.Marshal) // 将value序列化
 			pipe.Do(r.ctx, "EVAL", setQuery, 1, req.Key, ver, bt)
 			if ttl != nil && *ttl > 0 {
 				pipe.Do(r.ctx, "EXPIRE", req.Key, *ttl)
@@ -571,9 +572,10 @@ func (r *StateStore) Multi(request *state.TransactionalStateRequest) error {
 	return err
 }
 
+// 从存储到Redis中的数据中，解析出版本  vals=[k,v,k,v,...]
 func (r *StateStore) getKeyVersion(vals []interface{}) (data string, version *string, err error) {
-	seenData := false
-	seenVersion := false
+	seenData := false    // 所见的数据
+	seenVersion := false // 所见的数据
 	for i := 0; i < len(vals); i += 2 {
 		field, _ := strconv.Unquote(fmt.Sprintf("%q", vals[i]))
 		switch field {
@@ -587,13 +589,13 @@ func (r *StateStore) getKeyVersion(vals []interface{}) (data string, version *st
 		}
 	}
 	if !seenData || !seenVersion {
-		return "", nil, errors.New("required hash field 'data' or 'version' was not found")
+		return "", nil, errors.New("没有找到所需的哈希字段'data'或'version'。")
 	}
 
 	return data, version, nil
 }
 
-// 解析用书set数据  设置的ETAG
+// 解析用户set数据  设置的ETAG
 func (r *StateStore) parseETag(req *state.SetRequest) (int, error) {
 	if req.Options.Concurrency == state.LastWrite || req.ETag == nil || *req.ETag == "" { // 最后一次写,没有设置ETAG
 		return 0, nil
@@ -625,3 +627,6 @@ func (r *StateStore) Close() error {
 
 	return r.client.Close()
 }
+
+var _ state.TransactionalStore = &StateStore{}
+var _ state.Store = &StateStore{}

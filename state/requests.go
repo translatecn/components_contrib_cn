@@ -83,13 +83,13 @@ type TransactionalStateRequest struct {
 	Metadata   map[string]string             `json:"metadata,omitempty"`
 }
 
-// TransactionalStateOperation describes operation type, key, and value for transactional operation.
+// TransactionalStateOperation 描述了事务性操作的操作类型、键和值。
 type TransactionalStateOperation struct {
 	Operation OperationType `json:"operation"`
 	Request   interface{}   `json:"request"`
 }
 
-// KeyInt is an interface that allows gets of the Key and Metadata inside requests.
+// KeyInt 是一个接口，允许在请求中获取密钥和元数据。
 type KeyInt interface {
 	GetKey() string
 	GetMetadata() map[string]string
