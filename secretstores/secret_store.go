@@ -5,12 +5,12 @@
 
 package secretstores
 
-// SecretStore is the interface for a component that handles secrets management.
+// SecretStore 是一个处理秘密管理的组件的接口。
 type SecretStore interface {
-	// Init authenticates with the actual secret store and performs other init operation
+	// Init 与实际的秘密存储进行认证，并执行其他初始操作。
 	Init(metadata Metadata) error
-	// GetSecret retrieves a secret using a key and returns a map of decrypted string/string values
+	// GetSecret 使用密钥检索密钥，并返回解密的字符串/字符串值的映射
 	GetSecret(req GetSecretRequest) (GetSecretResponse, error)
-	// BulkGetSecrets retrieves all secrets in the store and returns a map of decrypted string/string values
+	// BulkGetSecret BulkGetSecrets 检索存储中的所有秘密，并返回解密字符串/字符串值的映射
 	BulkGetSecret(req BulkGetSecretRequest) (BulkGetSecretResponse, error)
 }

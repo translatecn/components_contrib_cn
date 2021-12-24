@@ -17,19 +17,19 @@ type envSecretStore struct {
 	logger logger.Logger
 }
 
-// NewEnvSecretStore returns a new env var secret store.
+// NewEnvSecretStore 返回一个新的env变量秘密存储。
 func NewEnvSecretStore(logger logger.Logger) secretstores.SecretStore {
 	return &envSecretStore{
 		logger: logger,
 	}
 }
 
-// Init creates a Local secret store.
+// Init 创建本地秘密存储。
 func (s *envSecretStore) Init(metadata secretstores.Metadata) error {
 	return nil
 }
 
-// GetSecret retrieves a secret from env var using provided key.
+// GetSecret 使用提供的键从环境变量中检索一个秘密。
 func (s *envSecretStore) GetSecret(req secretstores.GetSecretRequest) (secretstores.GetSecretResponse, error) {
 	return secretstores.GetSecretResponse{
 		Data: map[string]string{
@@ -38,7 +38,7 @@ func (s *envSecretStore) GetSecret(req secretstores.GetSecretRequest) (secretsto
 	}, nil
 }
 
-// BulkGetSecret retrieves all secrets in the store and returns a map of decrypted string/string values.
+// BulkGetSecret 检索存储中的所有秘密，并返回解密字符串/字符串值的映射。
 func (s *envSecretStore) BulkGetSecret(req secretstores.BulkGetSecretRequest) (secretstores.BulkGetSecretResponse, error) {
 	r := map[string]map[string]string{}
 
@@ -51,3 +51,5 @@ func (s *envSecretStore) BulkGetSecret(req secretstores.BulkGetSecretRequest) (s
 		Data: r,
 	}, nil
 }
+
+var _ secretstores.SecretStore = &envSecretStore{}
