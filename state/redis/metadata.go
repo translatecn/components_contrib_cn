@@ -10,5 +10,5 @@ import "time"
 type metadata struct {
 	maxRetries      int
 	maxRetryBackoff time.Duration
-	ttlInSeconds    *int
+	ttlInSeconds    *int // 过期时间
 }

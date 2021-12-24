@@ -43,7 +43,7 @@ type DeleteStateOption struct {
 	Consistency string `json:"consistency"`           // "eventual, strong"
 }
 
-// SetRequest is the object describing an upsert request.
+// SetRequest 是描述一个upsert请求的对象。
 type SetRequest struct {
 	Key      string            `json:"key"`
 	Value    interface{}       `json:"value"`
@@ -62,23 +62,22 @@ func (r SetRequest) GetMetadata() map[string]string {
 	return r.Metadata
 }
 
-// SetStateOption controls how a state store reacts to a set request.
+// SetStateOption 控制状态存储如何对设置请求做出反应。
 type SetStateOption struct {
-	Concurrency string `json:"concurrency,omitempty"` // first-write, last-write
-	Consistency string `json:"consistency"`           // "eventual, strong"
+	Concurrency string `json:"concurrency,omitempty"` // 首次写, 最后一次写
+	Consistency string `json:"consistency"`           // "最终一致性、强一致性"
 }
 
-// OperationType describes a CRUD operation performed against a state store.
+// OperationType 描述一个针对状态存储的CRUD操作。
 type OperationType string
 
-// Upsert is an update or create operation.
+// Upsert 是一个更新或创建操作。
 const Upsert OperationType = "upsert"
 
-// Delete is a delete operation.
+// Delete 是一个删除操作。
 const Delete OperationType = "delete"
 
-// TransactionalStateRequest describes a transactional operation against a state store that comprises multiple types of operations
-// The Request field is either a DeleteRequest or SetRequest.
+// TransactionalStateRequest 描述一个针对状态存储的事务性操作，包括多种类型的操作 Request字段是DeleteRequest或SetRequest。
 type TransactionalStateRequest struct {
 	Operations []TransactionalStateOperation `json:"operations"`
 	Metadata   map[string]string             `json:"metadata,omitempty"`

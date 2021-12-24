@@ -45,7 +45,7 @@ type StateStore struct {
 	clientSettings *rediscomponent.Settings
 	json           jsoniter.API
 	metadata       metadata
-	replicas       int  // 从机副本数
+	replicas       int // 从机副本数
 
 	features []state.Feature
 	logger   logger.Logger
@@ -65,6 +65,7 @@ func NewRedisStateStore(logger logger.Logger) *StateStore {
 
 	return s
 }
+
 // 从redis state 中解析出一些元数据
 func parseRedisMetadata(meta state.Metadata) (metadata, error) {
 	m := metadata{}
@@ -414,11 +415,11 @@ func (r *StateStore) directGet(req *state.GetRequest) (*state.GetResponse, error
 	}, nil
 }
 
-// Get retrieves state from redis with a key.
+// Get 从redis中检索带有密钥的状态。
 func (r *StateStore) Get(req *state.GetRequest) (*state.GetResponse, error) {
-	res, err := r.client.Do(r.ctx, "HGETALL", req.Key).Result() // Prefer values with ETags
+	res, err := r.client.Do(r.ctx, "HGETALL", req.Key).Result() // 倾向于带有ETags的值
 	if err != nil {
-		return r.directGet(req) // Falls back to original get for backward compats.
+		return r.directGet(req) // 回落到原来的得到，以便向后兼容。
 	}
 	if res == nil {
 		return &state.GetResponse{}, nil
@@ -438,7 +439,7 @@ func (r *StateStore) Get(req *state.GetRequest) (*state.GetResponse, error) {
 		ETag: version,
 	}, nil
 }
-
+// 真正在状态存储的方法
 func (r *StateStore) setValue(req *state.SetRequest) error {
 	err := state.CheckRequestOptions(req.Options)
 	if err != nil {
@@ -450,20 +451,35 @@ func (r *StateStore) setValue(req *state.SetRequest) error {
 	}
 	ttl, err := r.parseTTL(req)
 	if err != nil {
-		return fmt.Errorf("failed to parse ttl from metadata: %s", err)
+		return fmt.Errorf("未能从元数据中解析ttl: %s", err)
 	}
 	// apply global TTL
 	if ttl == nil {
 		ttl = r.metadata.ttlInSeconds
 	}
-
+	// 序列化value
 	bt, _ := utils.Marshal(req.Value, r.json.Marshal)
 
 	firstWrite := 1
 	if req.Options.Concurrency == state.FirstWrite {
 		firstWrite = 0
 	}
+	// 调用lua 脚本，设置值，同时设置版本号【ETAG】        1个KEYS参数  [KEY...] [ARGV...]
 	_, err = r.client.Do(r.ctx, "EVAL", setQuery, 1, req.Key, ver, bt, firstWrite).Result()
+	// todo 第一次设置了以后，version=1 ,第二次调用，因为version存在会直接反回错误
+	// 获取 key.version
+	// if type(version) == dict{
+	//    delete key
+	//}
+	//获取key.first-write  							1 demo 12 value 1
+	// if version 不存在| type(version) == dict | version=="" | var1 == ARGV[1] | (not var2 and ARGV[1] == "0")
+	//  	"HSET", demo, "data", ARGV[2]
+	//   	if ARGV[3] == "0"
+	//  		"HSET", demo , "first-write" 0,
+	//   	HINCRBY", demo, "version", 1
+	// else
+	// 		return error("failed to set key " .. KEYS[1])
+
 	if err != nil {
 		if req.ETag != nil {
 			return state.NewETagError(state.ETagMismatch, err)
@@ -496,7 +512,7 @@ func (r *StateStore) setValue(req *state.SetRequest) error {
 	return nil
 }
 
-// Set saves state into redis.
+// Set 将状态保存到redis。
 func (r *StateStore) Set(req *state.SetRequest) error {
 	return state.SetWithOptions(r.setValue, req)
 }
@@ -565,12 +581,12 @@ func (r *StateStore) getKeyVersion(vals []interface{}) (data string, version *st
 
 	return data, version, nil
 }
-
+// 解析用书set数据  设置的ETAG
 func (r *StateStore) parseETag(req *state.SetRequest) (int, error) {
-	if req.Options.Concurrency == state.LastWrite || req.ETag == nil || *req.ETag == "" {
+	if req.Options.Concurrency == state.LastWrite || req.ETag == nil || *req.ETag == "" { // 最后一次写,没有设置ETAG
 		return 0, nil
 	}
-	ver, err := strconv.Atoi(*req.ETag)
+	ver, err := strconv.Atoi(*req.ETag)// etag 必须是数字型字符串
 	if err != nil {
 		return -1, state.NewETagError(state.ETagInvalid, err)
 	}

@@ -13,11 +13,11 @@ import (
 type ETagErrorKind string
 
 const (
-	mismatchPrefix = "possible etag mismatch. error from state store"
-	invalidPrefix  = "invalid etag value"
+	mismatchPrefix = "可能的etag不匹配。来自状态存储的错误"
+	invalidPrefix  = "无效的ETAG值"
 
-	ETagInvalid  ETagErrorKind = "invalid"
-	ETagMismatch ETagErrorKind = "mismatch"
+	ETagInvalid  ETagErrorKind = "无效"
+	ETagMismatch ETagErrorKind = "不匹配"
 )
 
 // ETagError is a custom error type for etag exceptions.
@@ -47,7 +47,7 @@ func (e *ETagError) Error() string {
 	return errors.New(prefix).Error()
 }
 
-// NewETagError returns an ETagError wrapping an existing context error.
+// NewETagError 返回一个包裹着现有上下文错误的ETagError。
 func NewETagError(kind ETagErrorKind, err error) *ETagError {
 	return &ETagError{
 		err:  err,
