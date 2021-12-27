@@ -147,12 +147,12 @@ func (r *redisStreams) Init(metadata pubsub.Metadata) error {
 }
 
 func (r *redisStreams) Publish(req *pubsub.PublishRequest) error {
-	xxx, err := r.client.XAdd(r.ctx, &redis.XAddArgs{
+	streamID, err := r.client.XAdd(r.ctx, &redis.XAddArgs{
 		Stream:       req.Topic,
 		MaxLenApprox: r.metadata.maxLenApprox,
 		Values:       map[string]interface{}{"data": req.Data},
 	}).Result()
-	r.logger.Info(xxx)
+	r.logger.Infof("redis 流id%s\n", streamID)
 	if err != nil {
 		return fmt.Errorf("redis streams: 发布产生错误: %s", err)
 	}
@@ -160,12 +160,14 @@ func (r *redisStreams) Publish(req *pubsub.PublishRequest) error {
 	return nil
 }
 
+// ------------
+
 func (r *redisStreams) Subscribe(req pubsub.SubscribeRequest, handler pubsub.Handler) error {
 	err := r.client.XGroupCreateMkStream(r.ctx, req.Topic, r.metadata.consumerID, "0").Err()
 	// Ignore BUSYGROUP errors
+	// BUSYGROUP 消费者组名称已经存在
 	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
 		r.logger.Errorf("redis streams: %s", err)
-
 		return err
 	}
 
@@ -215,6 +217,7 @@ func createRedisMessageWrapper(stream string, handler pubsub.Handler, msg redis.
 
 // worker 在独立的goroutine中运行，并从通道中提取消息进行处理。工作者的数量由`concurrency`设置来控制。
 func (r *redisStreams) worker() {
+	// 没有数据 会一直阻塞
 	for {
 		select {
 		// 处理取消的问题
@@ -406,8 +409,9 @@ func (r *redisStreams) removeMessagesThatNoLongerExistFromPending(stream string,
 }
 
 func (r *redisStreams) Close() error {
+	// context 关闭
 	r.cancel()
-
+	// 关闭客户端
 	return r.client.Close()
 }
 
