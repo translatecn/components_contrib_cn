@@ -15,29 +15,29 @@ import (
 )
 
 const (
-	// TTLMetadataKey defines the metadata key for setting a time to live (in seconds).
+	// TTLMetadataKey 定义元数据键用于设置生存时间(以秒为单位)。
 	TTLMetadataKey = "ttlInSeconds"
 
-	// RawPayloadKey defines the metadata key for forcing raw payload in pubsub.
+	// RawPayloadKey 定义了在pubsub中强迫原始有效载荷的元数据密钥。
 	RawPayloadKey = "rawPayload"
 
-	// PriorityMetadataKey defines the metadata key for setting a priority.
+	// PriorityMetadataKey 定义了用于设置优先级的元数据键。
 	PriorityMetadataKey = "priority"
 
-	// ContentType defines the metadata key for the content type.
+	// ContentType 定义了内容类型的元数据键。
 	ContentType = "contentType"
 )
 
-// TryGetTTL tries to get the ttl as a time.Duration value for pubsub, binding and any other building block.
+// TryGetTTL 试着把TTL作为时间。pubsub、binding和任何其他构建块的持续时间值。
 func TryGetTTL(props map[string]string) (time.Duration, bool, error) {
 	if val, ok := props[TTLMetadataKey]; ok && val != "" {
 		valInt64, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			return 0, false, errors.Wrapf(err, "%s value must be a valid integer: actual is '%s'", TTLMetadataKey, val)
+			return 0, false, errors.Wrapf(err, "%s 必须为有效的整数:实际 '%s'", TTLMetadataKey, val)
 		}
 
 		if valInt64 <= 0 {
-			return 0, false, fmt.Errorf("%s value must be higher than zero: actual is %d", TTLMetadataKey, valInt64)
+			return 0, false, fmt.Errorf("%s 值必须大于零:实际为 %d", TTLMetadataKey, valInt64)
 		}
 
 		duration := time.Duration(valInt64) * time.Second
@@ -73,12 +73,12 @@ func TryGetPriority(props map[string]string) (uint8, bool, error) {
 	return 0, false, nil
 }
 
-// IsRawPayload determines if payload should be used as-is.
+// IsRawPayload 决定是否应按原样使用有效载荷。
 func IsRawPayload(props map[string]string) (bool, error) {
 	if val, ok := props[RawPayloadKey]; ok && val != "" {
 		boolVal, err := strconv.ParseBool(val)
 		if err != nil {
-			return false, errors.Wrapf(err, "%s value must be a valid boolean: actual is '%s'", RawPayloadKey, val)
+			return false, errors.Wrapf(err, "%s Value必须是一个有效的布尔值:actual是 '%s'", RawPayloadKey, val)
 		}
 
 		return boolVal, nil

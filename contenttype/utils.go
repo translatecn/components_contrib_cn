@@ -8,13 +8,13 @@ package contenttype
 import "strings"
 
 const (
-	// CloudEventContentType is the content type for cloud event.
+	// CloudEventContentType 云事件的消息类型
 	CloudEventContentType = "application/cloudevents+json"
-	// JSONContentType is the content type for JSON.
+	// JSONContentType
 	JSONContentType = "application/json"
 )
 
-// IsCloudEventContentType checks for content type.
+// IsCloudEventContentType 检查内容类型。
 func IsCloudEventContentType(contentType string) bool {
 	return isContentType(contentType, CloudEventContentType)
 }
@@ -39,6 +39,7 @@ func IsBinaryContentType(contentType string) bool {
 }
 
 func isContentType(contentType string, expected string) bool {
+	// 用户请求的、期待的
 	lowerContentType := strings.ToLower(contentType)
 	if lowerContentType == expected {
 		return true
@@ -46,6 +47,7 @@ func isContentType(contentType string, expected string) bool {
 
 	semiColonPos := strings.Index(lowerContentType, ";")
 	if semiColonPos >= 0 {
+		// 匹配第一个content-type     e.g.   a;b
 		return lowerContentType[0:semiColonPos] == expected
 	}
 

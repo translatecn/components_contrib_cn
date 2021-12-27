@@ -120,8 +120,9 @@ func parseRedisMetadata(meta pubsub.Metadata) (metadata, error) {
 	return m, nil
 }
 
+// Init OK
 func (r *redisStreams) Init(metadata pubsub.Metadata) error {
-	m, err := parseRedisMetadata(metadata)// 获取到对于Redis有用的配置
+	m, err := parseRedisMetadata(metadata) // 获取到对于Redis有用的配置
 	if err != nil {
 		return err
 	}
@@ -146,13 +147,14 @@ func (r *redisStreams) Init(metadata pubsub.Metadata) error {
 }
 
 func (r *redisStreams) Publish(req *pubsub.PublishRequest) error {
-	_, err := r.client.XAdd(r.ctx, &redis.XAddArgs{
+	xxx, err := r.client.XAdd(r.ctx, &redis.XAddArgs{
 		Stream:       req.Topic,
 		MaxLenApprox: r.metadata.maxLenApprox,
 		Values:       map[string]interface{}{"data": req.Data},
 	}).Result()
+	r.logger.Info(xxx)
 	if err != nil {
-		return fmt.Errorf("redis streams: error from publish: %s", err)
+		return fmt.Errorf("redis streams: 发布产生错误: %s", err)
 	}
 
 	return nil
@@ -173,9 +175,7 @@ func (r *redisStreams) Subscribe(req pubsub.SubscribeRequest, handler pubsub.Han
 	return nil
 }
 
-// enqueueMessages is a shared function that funnels new messages (via polling)
-// and redelivered messages (via reclaiming) to a channel where workers can
-// pick them up for processing.
+// enqueueMessages 是一个共享函数，它将新的消息（通过轮询）和重新交付的消息（通过回收）输送到一个通道，工人可以在那里 拾取它们进行处理。
 func (r *redisStreams) enqueueMessages(stream string, handler pubsub.Handler, msgs []redis.XMessage) {
 	for _, msg := range msgs {
 		rmsg := createRedisMessageWrapper(stream, handler, msg)
@@ -191,8 +191,7 @@ func (r *redisStreams) enqueueMessages(stream string, handler pubsub.Handler, ms
 	}
 }
 
-// createRedisMessageWrapper encapsulates the Redis message, message identifier, and handler
-// in `redisMessage` for processing.
+// createRedisMessageWrapper 将Redis消息、消息标识符和处理器封装在' redisMessage '中进行处理。
 func createRedisMessageWrapper(stream string, handler pubsub.Handler, msg redis.XMessage) redisMessageWrapper {
 	var data []byte
 	if dataValue, exists := msg.Values["data"]; exists && dataValue != nil {
@@ -228,10 +227,7 @@ func (r *redisStreams) worker() {
 	}
 }
 
-// processMessage attempts to process a single Redis message by invoking
-// its handler. If the message processed successfully, then it is Ack'ed.
-// Otherwise, it remains in the pending list and will be redelivered
-// by `reclaimPendingMessagesLoop`.
+// processMessage 试图通过调用它的处理器来处理单个Redis消息。如果消息被成功处理，那么它是Ack'ed。否则，它将保持在等待列表中，并将通过' reclaimPendingMessagesLoop '重新交付。
 func (r *redisStreams) processMessage(msg redisMessageWrapper) error {
 	r.logger.Debugf("Processing Redis message %s", msg.messageID)
 	ctx := r.ctx
