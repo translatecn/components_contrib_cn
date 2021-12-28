@@ -124,10 +124,10 @@ func FromCloudEvent(cloudEvent []byte, topic, pubsub, traceID string) (map[strin
 
 // FromRawPayload 在订阅者端返回原始负载的clouddevent。
 func FromRawPayload(data []byte, topic, pubsub string) map[string]interface{} {
-	// Limitations of generating the CloudEvent on the subscriber side based on raw payload:
-	// - The CloudEvent ID will be random, so the same message can be redelivered as a different ID.
-	// - TraceID is not useful since it is random and not from publisher side.
-	// - Data is always returned as `data_base64` since we don't know the actual content type.
+	// 基于原始有效载荷在用户端生成CloudEvent的局限性:
+	// - 云事件的ID将是随机的，因此同一消息可以以不同的ID重新发送。.
+	// - TraceID没有用，因为它是随机的，不是来自发布者一方。
+	// - 由于我们不知道实际的内容类型，数据总是以`data_base64`的形式返回。
 	return map[string]interface{}{
 		IDField:              uuid.New().String(),
 		SpecVersionField:     CloudEventsSpecVersion,
@@ -140,7 +140,7 @@ func FromRawPayload(data []byte, topic, pubsub string) map[string]interface{} {
 	}
 }
 
-// HasExpired determines if the current cloud event has expired.
+// HasExpired 确定当前的云事件是否已经过期。
 func HasExpired(cloudEvent map[string]interface{}) bool {
 	e, ok := cloudEvent[ExpirationField]
 	if ok && e != "" {

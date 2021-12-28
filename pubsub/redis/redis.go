@@ -70,7 +70,7 @@ func parseRedisMetadata(meta pubsub.Metadata) (metadata, error) {
 	if val, ok := meta.Properties[consumerID]; ok && val != "" {
 		m.consumerID = val
 	} else {
-		return m, errors.New("redis streams error: missing consumerID")
+		return m, errors.New("redis流错误：缺少consumerID")
 	}
 
 	if val, ok := meta.Properties[processingTimeout]; ok && val != "" {
@@ -138,7 +138,7 @@ func (r *redisStreams) Init(metadata pubsub.Metadata) error {
 		return fmt.Errorf("redis streams: 错误连接到redis at %s: %s", r.clientSettings.Host, err)
 	}
 	r.queue = make(chan redisMessageWrapper, int(r.metadata.queueDepth))
-
+	// 在pub组件初始化时，就声明了
 	for i := uint(0); i < r.metadata.concurrency; i++ {
 		go r.worker()
 	}
@@ -164,8 +164,8 @@ func (r *redisStreams) Publish(req *pubsub.PublishRequest) error {
 
 func (r *redisStreams) Subscribe(req pubsub.SubscribeRequest, handler pubsub.Handler) error {
 	//XGROUP CREATE mystream mygroup $ MKSTREAM
-	//XGROUP DESTROY mystream consumer-group-name
 	//上面的$表示group的offset是队列中的最后一个元素，MKSTREAM这个参数会判断stream是否存在，如果不存在会创建一个我们指定名称的stream，不加这个参数，stream不存在会报错。
+	//XGROUP DESTROY mystream consumer-group-name
 
 	//XREADGROUP GROUP mygroup Alice BLOCK 2000 COUNT 1 STREAMS mystream >
 	//		这个命令是使用消费组mygroup的Alice这个消费者从mystream这个stream中读取1条消息。
@@ -176,6 +176,11 @@ func (r *redisStreams) Subscribe(req pubsub.SubscribeRequest, handler pubsub.Han
 	//XREAD是消费组读取消息，我们看下面这个命令：
 	//XREAD COUNT 2 STREAMS mystream writers 0-0 0-0XACK mystream mygroup 1526569495631-0
 	//注意：上面这个示例是从mystream和writers这2个stream中读取消息，offset都是0，COUNT参数指定了每个队列中读取的消息数量不多余2个
+
+	// consumerID 为pub声明的、或者是本应用的ID
+	// 如果执行到此；分为两种
+	// 1：自身应用
+	// 2：指定了消费者组
 	err := r.client.XGroupCreateMkStream(r.ctx, req.Topic, r.metadata.consumerID, "0").Err()
 	// Ignore BUSYGROUP errors
 	// BUSYGROUP 消费者组名称已经存在
@@ -184,8 +189,8 @@ func (r *redisStreams) Subscribe(req pubsub.SubscribeRequest, handler pubsub.Han
 		return err
 	}
 
-	go r.pollNewMessagesLoop(req.Topic, handler)
-	go r.reclaimPendingMessagesLoop(req.Topic, handler)
+	go r.pollNewMessagesLoop(req.Topic, handler)           // 轮询新消息的循环
+	go r.reclaimPendingMessagesLoop(req.Topic, handler) // 回收待处理的信息循环
 
 	return nil
 }
@@ -196,10 +201,10 @@ func (r *redisStreams) enqueueMessages(stream string, handler pubsub.Handler, ms
 		rmsg := createRedisMessageWrapper(stream, handler, msg)
 
 		select {
-		// Might block if the queue is full so we need the r.ctx.Done below.
+		// 如果队列已满，可能会阻塞，所以我们需要下面的r.ctx.Done。
 		case r.queue <- rmsg:
 
-		// Handle cancelation
+		// 处理取消信号
 		case <-r.ctx.Done():
 			return
 		}
@@ -220,11 +225,11 @@ func createRedisMessageWrapper(stream string, handler pubsub.Handler, msg redis.
 
 	return redisMessageWrapper{
 		message: pubsub.NewMessage{
-			Topic: stream,
-			Data:  data,
+			Topic: stream, // 流的名称
+			Data:  data,   // 消息主体
 		},
-		messageID: msg.ID,
-		handler:   handler,
+		messageID: msg.ID,  // 消息ID
+		handler:   handler, // 处理方法
 	}
 }
 
@@ -237,38 +242,36 @@ func (r *redisStreams) worker() {
 		case <-r.ctx.Done():
 			return
 
-		case msg := <-r.queue:
-			r.processMessage(msg)
+		case msg := <-r.queue: // 只有订阅了才会往这个队列里塞数据
+			r.processMessage(msg) // 处理消息
 		}
 	}
 }
 
 // processMessage 试图通过调用它的处理器来处理单个Redis消息。如果消息被成功处理，那么它是Ack'ed。否则，它将保持在等待列表中，并将通过' reclaimPendingMessagesLoop '重新交付。
 func (r *redisStreams) processMessage(msg redisMessageWrapper) error {
-	r.logger.Debugf("Processing Redis message %s", msg.messageID)
+	r.logger.Debugf("处理Redis消息 %s", msg.messageID)
 	ctx := r.ctx
 	var cancel context.CancelFunc
 	if r.metadata.processingTimeout != 0 && r.metadata.redeliverInterval != 0 {
 		ctx, cancel = context.WithTimeout(ctx, r.metadata.processingTimeout)
 		defer cancel()
 	}
-	if err := msg.handler(ctx, &msg.message); err != nil {
-		r.logger.Errorf("Error processing Redis message %s: %v", msg.messageID, err)
 
+	if err := msg.handler(ctx, &msg.message); err != nil {
+		r.logger.Errorf("处理Redis信息出错 %s: %v", msg.messageID, err)
 		return err
 	}
 
 	if err := r.client.XAck(r.ctx, msg.message.Topic, r.metadata.consumerID, msg.messageID).Err(); err != nil {
-		r.logger.Errorf("Error acknowledging Redis message %s: %v", msg.messageID, err)
-
+		r.logger.Errorf("确认Redis消息的出错 %s: %v", msg.messageID, err)
 		return err
 	}
 
 	return nil
 }
 
-// pollMessagesLoop calls `XReadGroup` for new messages and funnels them to the message channel
-// by calling `enqueueMessages`.
+// pollMessagesLoop calls `XReadGroup` 来获取新的消息，并通过调用 "enqueueMessages "将其输送到消息通道。
 func (r *redisStreams) pollNewMessagesLoop(stream string, handler pubsub.Handler) {
 	for {
 		// Return on cancelation
@@ -276,23 +279,28 @@ func (r *redisStreams) pollNewMessagesLoop(stream string, handler pubsub.Handler
 			return
 		}
 
-		// Read messages
+		//XREADGROUP GROUP mygroup Alice BLOCK 2000 COUNT 1 STREAMS mystream >
+		//		这个命令是使用消费组mygroup的Alice这个消费者从mystream这个stream中读取1条消息。
+		//		注意：
+		//		上面使用了BLOCK，表示是阻塞读取，如果读不到数据，会阻塞等待2s，不加这个条件默认是不阻塞的
+		//		">"表示只接受其他消费者没有消费过的消息
+		//		如果没有">",消费者会消费比指定id偏移量大并且没有被自己确认过的消息，这样就不用关系是否ACK过或者是否BLOCK了。
 		streams, err := r.client.XReadGroup(r.ctx, &redis.XReadGroupArgs{
 			Group:    r.metadata.consumerID,
 			Consumer: r.metadata.consumerID,
 			Streams:  []string{stream, ">"},
 			Count:    int64(r.metadata.queueDepth),
-			Block:    time.Duration(r.clientSettings.ReadTimeout),
+			Block:    time.Duration(r.clientSettings.ReadTimeout), // 一定要设置，不然死循环 CPU占用很多, 为0 的话，就一直阻塞
 		}).Result()
 		if err != nil {
 			if !errors.Is(err, redis.Nil) {
-				r.logger.Errorf("redis streams: error reading from stream %s: %s", stream, err)
+				r.logger.Errorf("redis流：从流中读取错误 %s: %s", stream, err)
 			}
 
 			continue
 		}
 
-		// Enqueue messages for the returned streams
+		// 对返回的流进行信息排队
 		for _, s := range streams {
 			r.enqueueMessages(s.Stream, handler, s.Messages)
 		}
