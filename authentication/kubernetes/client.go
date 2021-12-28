@@ -7,6 +7,7 @@ package kubernetes
 
 import (
 	"flag"
+	"fmt"
 	"path/filepath"
 
 	"k8s.io/client-go/kubernetes"
@@ -27,9 +28,13 @@ func init() {
 	}
 }
 
-// GetKubeClient returns a kubernetes client.
+// GetKubeClient 根据SA config 创建k8s客户端
 func GetKubeClient() (*kubernetes.Clientset, error) {
 	flag.Parse()
+	fmt.Println(*kubeconfig)
+	// unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined
+	//返回使用kubernetes提供给pod的服务帐户的配置对象。它是为那些希望在kubernetes上运行的pod中运行的客户端设计的。
+	//如果从一个不在kubernetes环境中运行的进程调用，它将返回errnotinclcluster。
 	conf, err := rest.InClusterConfig()
 	if err != nil {
 		conf, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)

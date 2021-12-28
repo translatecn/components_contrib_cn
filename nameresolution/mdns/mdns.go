@@ -23,8 +23,7 @@ import (
 )
 
 const (
-	// firstOnlyTimeout is the timeout used when
-	// browsing for the first response to a single app id.
+	// firstOnlyTimeout 是浏览单个应用程序ID的第一个响应时使用的超时。
 	firstOnlyTimeout = time.Second * 1
 	// refreshTimeout is the timeout used when
 	// browsing for any responses to a single app id.
@@ -32,31 +31,26 @@ const (
 	// refreshInterval is the duration between
 	// background address refreshes.
 	refreshInterval = time.Second * 30
-	// addressTTL is the duration an address has before
-	// becoming stale and being evicted.
+	// addressTTL 域名解析的有效时长
 	addressTTL = time.Second * 60
 	// max integer value supported on this architecture.
 	maxInt = int(^uint(0) >> 1)
 )
 
-// address is used to store an ip address along with
-// an expiry time at which point the address is considered
-// too stale to trust.
+// address 是用来存储一个IP地址和一个过期时间，在这个时间点上，该地址被认为是过期的，不能信任。
 type address struct {
 	ip        string
 	expiresAt time.Time
 }
 
-// addressList represents a set of addresses along with
-// data used to control and access said addresses.
+// addressList 代表一组地址，以及用于控制和访问所述地址的数据。
 type addressList struct {
-	addresses []address
+	addresses []address // 已经按照日期从大到小排序好了            9点 8点 7点 6点 5点  4点
 	counter   int
-	mu        sync.RWMutex
+	mu        sync.RWMutex // 应用级别的锁
 }
 
-// expire removes any addresses with an expiry time earlier
-// than the current time.
+// expire 删除任何过期时间早于当前时间的地址。
 func (a *addressList) expire() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -71,10 +65,8 @@ func (a *addressList) expire() {
 	a.addresses = a.addresses[:i]
 }
 
-// add adds a new address to the address list with a
-// maximum expiry time. For existing addresses, the
-// expiry time is updated to the maximum.
-// TODO: Consider enforcing a maximum address list size.
+// add 将一个新的地址添加到地址列表中，并规定了最长的有效期。对于现有的地址，过期时间被更新为最大值。
+// TODO: 考虑 最大的地址列表长度。
 func (a *addressList) add(ip string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -114,7 +106,7 @@ func (a *addressList) next() *string {
 	return &addr.ip
 }
 
-// NewResolver creates the instance of mDNS name resolver.
+// NewResolver 创建mdns解析的实例
 func NewResolver(logger logger.Logger) nameresolution.Resolver {
 	r := &resolver{
 		appAddressesIPv4: make(map[string]*addressList),
@@ -123,7 +115,7 @@ func NewResolver(logger logger.Logger) nameresolution.Resolver {
 		logger:           logger,
 	}
 
-	// refresh app addresses on demand.
+	// 按需刷新所有的应用程序地址。
 	go func() {
 		for appID := range r.refreshChan {
 			if err := r.refreshApp(context.Background(), appID); err != nil {
@@ -132,7 +124,7 @@ func NewResolver(logger logger.Logger) nameresolution.Resolver {
 		}
 	}()
 
-	// refresh all app addresses periodically.
+	// 定期刷新所有的应用程序地址。
 	go func() {
 		for {
 			time.Sleep(refreshInterval)
@@ -148,9 +140,9 @@ func NewResolver(logger logger.Logger) nameresolution.Resolver {
 
 type resolver struct {
 	ipv4Mu           sync.RWMutex
-	appAddressesIPv4 map[string]*addressList
+	appAddressesIPv4 map[string]*addressList // 应用ID : &实例列表
 	ipv6Mu           sync.RWMutex
-	appAddressesIPv6 map[string]*addressList
+	appAddressesIPv6 map[string]*addressList // 应用ID : &实例列表
 	refreshChan      chan string
 	logger           logger.Logger
 }
@@ -167,20 +159,20 @@ func (m *resolver) Init(metadata nameresolution.Metadata) error {
 	props := metadata.Properties
 
 	if appID, ok = props[nameresolution.MDNSInstanceName]; !ok {
-		return errors.New("name is missing")
+		return errors.New("没有名称")
 	}
 	if hostAddress, ok = props[nameresolution.MDNSInstanceAddress]; !ok {
-		return errors.New("address is missing")
+		return errors.New("没有地址")
 	}
 
 	p, ok := props[nameresolution.MDNSInstancePort]
 	if !ok {
-		return errors.New("port is missing")
+		return errors.New("没有端口")
 	}
 
 	port, err := strconv.ParseInt(p, 10, 32)
 	if err != nil {
-		return errors.New("port is invalid")
+		return errors.New("端口无效")
 	}
 
 	if instanceID, ok = props[nameresolution.MDNSInstanceID]; !ok {
@@ -189,7 +181,7 @@ func (m *resolver) Init(metadata nameresolution.Metadata) error {
 
 	err = m.registerMDNS(instanceID, appID, []string{hostAddress}, int(port))
 	if err == nil {
-		m.logger.Infof("local service entry announced: %s -> %s:%d", appID, hostAddress, port)
+		m.logger.Infof("公布本地服务入口: %s -> %s:%d", appID, hostAddress, port)
 	}
 
 	return err
@@ -306,14 +298,13 @@ func (m *resolver) browseFirstOnly(ctx context.Context, appID string) (string, e
 	return addr, nil
 }
 
-// refreshApp will perform a mDNS network browse for a provided
-// app id. This function is blocking.
+// refreshApp 将对所提供的应用程序ID进行mDNS网络浏览。 这个函数是封锁的。
 func (m *resolver) refreshApp(ctx context.Context, appID string) error {
 	if appID == "" {
 		return nil
 	}
 
-	m.logger.Debugf("Refreshing mDNS addresses for app id %s.", appID)
+	m.logger.Debugf("刷新%s的mDNS地址.", appID)
 
 	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
 	defer cancel()
@@ -322,27 +313,24 @@ func (m *resolver) refreshApp(ctx context.Context, appID string) error {
 		return err
 	}
 
-	// wait for the context to be canceled or time out.
+	// 等到上下文被取消或超时。
 	<-ctx.Done()
 
 	if errors.Is(ctx.Err(), context.Canceled) {
-		// this is not expected, investigate why context was canceled.
-		m.logger.Warnf("Refreshing mDNS addresses for app id %s canceled.", appID)
+		// 这不是预期的，请调查为什么context被取消了。
+		m.logger.Warnf("取消了刷新%s的mDNS地址 .", appID)
 	} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		// expect this when our browse has timedout.
-		m.logger.Debugf("Refreshing mDNS addresses for app id %s timed out.", appID)
+		m.logger.Debugf("刷新%s的mDNS地址超时了", appID)
 	}
 
 	return nil
 }
 
-// refreshAllApps will perform a mDNS network browse for each address
-// currently in the cache. This function is blocking.
+// refreshAllApps 将对当前缓存中的每个地址进行mDNS网络浏览。这个函数是阻塞的。
 func (m *resolver) refreshAllApps(ctx context.Context) error {
-	m.logger.Debug("Refreshing all mDNS addresses.")
+	m.logger.Debug("刷新 all mDNS addresses.")
 
-	// check if we have any IPv4 or IPv6 addresses
-	// in the address cache that need refreshing.
+	// 检查我们的地址缓存中是否有任何需要刷新的IPv4或IPv6地址。
 	m.ipv4Mu.RLock()
 	numAppIPv4Addr := len(m.appAddressesIPv4)
 	m.ipv4Mu.RUnlock()
@@ -360,33 +348,38 @@ func (m *resolver) refreshAllApps(ctx context.Context) error {
 
 	var wg sync.WaitGroup
 
-	// expired addresses will be evicted by getAppIDs()
+	// 过期的地址将被驱逐  getAppIDs()
 	for _, appID := range m.getAppIDs() {
 		wg.Add(1)
 
 		go func(a string) {
 			defer wg.Done()
 
-			m.refreshApp(ctx, a)
+			err := m.refreshApp(ctx, a)
+			if err != nil {
+				return
+			}
 		}(appID)
 	}
 
-	// wait for all the app refreshes to complete.
+	// 等待所有应用刷新完成
 	wg.Wait()
 
 	return nil
 }
 
-// browse will perform a non-blocking mdns network browse for the provided app id.
+// browse 将对所提供的应用程序ID进行无阻塞的mdns网络浏览。
 func (m *resolver) browse(ctx context.Context, appID string, onEach func(ip string)) error {
+	//todo https://github.com/ls-2018/mdns
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
-		return fmt.Errorf("failed to initialize resolver: %e", err)
+		return fmt.Errorf("未能初始化解析器: %e", err)
 	}
 	entries := make(chan *zeroconf.ServiceEntry)
 
-	// handle each service entry returned from the mDNS browse.
+	// 处理从mDNS浏览返回的每个服务条目。
 	go func(results <-chan *zeroconf.ServiceEntry) {
+		//处理返回每一条结果
 		for {
 			select {
 			case <-ctx.Done():
@@ -395,37 +388,29 @@ func (m *resolver) browse(ctx context.Context, appID string, onEach func(ip stri
 				} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					m.logger.Debugf("mDNS browse for app id %s timed out.", appID)
 				}
-
 				return
 			case entry := <-results:
 				if entry == nil {
 					break
 				}
-
 				for _, text := range entry.Text {
 					if text != appID {
 						m.logger.Debugf("mDNS response doesn't match app id %s, skipping.", appID)
-
 						break
 					}
-
 					m.logger.Debugf("mDNS response for app id %s received.", appID)
-
 					hasIPv4Address := len(entry.AddrIPv4) > 0
 					hasIPv6Address := len(entry.AddrIPv6) > 0
-
 					if !hasIPv4Address && !hasIPv6Address {
 						m.logger.Debugf("mDNS response for app id %s doesn't contain any IPv4 or IPv6 addresses, skipping.", appID)
-
 						break
 					}
 
 					var addr string
 					port := entry.Port
 
-					// TODO: We currently only use the first IPv4 and IPv6 address.
-					// We should understand the cases in which additional addresses
-					// are returned and whether we need to support them.
+					// TODO: 我们目前只使用第一个IPv4和IPv6地址。
+					// 我们应该了解在哪些情况下会有额外的地址 以及我们是否需要支持它们。
 					if hasIPv4Address {
 						addr = fmt.Sprintf("%s:%d", entry.AddrIPv4[0].String(), port)
 						m.addAppAddressIPv4(appID, addr)
@@ -436,15 +421,15 @@ func (m *resolver) browse(ctx context.Context, appID string, onEach func(ip stri
 					}
 
 					if onEach != nil {
-						onEach(addr) // invoke callback.
+						onEach(addr) // 回调函数
 					}
 				}
 			}
 		}
 	}(entries)
-
+	// 在local.域查找 appID
 	if err = resolver.Browse(ctx, appID, "local.", entries); err != nil {
-		return fmt.Errorf("failed to browse: %s", err.Error())
+		return fmt.Errorf("浏览失败: %s", err.Error())
 	}
 
 	return nil
@@ -478,42 +463,39 @@ func (m *resolver) addAppAddressIPv6(appID string, addr string) {
 	m.appAddressesIPv6[appID].add(addr)
 }
 
-// getAppIDsIPv4 returns a list of the current IPv4 app IDs.
-// This method uses expire on read to evict expired addreses.
+// getAppIDsIPv4 返回一个当前IPv4应用程序ID的列表。该方法使用expire on read来驱逐过期的地址。
 func (m *resolver) getAppIDsIPv4() []string {
 	m.ipv4Mu.RLock()
 	defer m.ipv4Mu.RUnlock()
 
 	appIDs := make([]string, 0, len(m.appAddressesIPv4))
-	for appID, addr := range m.appAddressesIPv4 {
-		old := len(addr.addresses)
-		addr.expire()
-		m.logger.Debugf("%d IPv4 address(es) expired for app id %s.", old-len(addr.addresses), appID)
+	for appID, addrList := range m.appAddressesIPv4 {
+		old := len(addrList.addresses)
+		addrList.expire() // 驱逐过期的节点
+		m.logger.Debugf("%d IPv4 地址被驱逐 app id %s.", old-len(addrList.addresses), appID)
 		appIDs = append(appIDs, appID)
 	}
 
 	return appIDs
 }
 
-// getAppIDsIPv6 returns a list of the known IPv6 app IDs.
-// This method uses expire on read to evict expired addreses.
+// getAppIDsIPv6 返回一个当前IPv6应用程序ID的列表。该方法使用expire on read来驱逐过期的地址。
 func (m *resolver) getAppIDsIPv6() []string {
 	m.ipv6Mu.RLock()
 	defer m.ipv6Mu.RUnlock()
 
 	appIDs := make([]string, 0, len(m.appAddressesIPv6))
-	for appID, addr := range m.appAddressesIPv6 {
-		old := len(addr.addresses)
-		addr.expire()
-		m.logger.Debugf("%d IPv6 address(es) expired for app id %s.", old-len(addr.addresses), appID)
+	for appID, addrList := range m.appAddressesIPv6 {
+		old := len(addrList.addresses)
+		addrList.expire()
+		m.logger.Debugf("%d IPv6 地址被驱逐 app id %s.", old-len(addrList.addresses), appID)
 		appIDs = append(appIDs, appID)
 	}
 
 	return appIDs
 }
 
-// getAppIDs returns a list of app ids currently in
-// the cache, ensuring expired addresses are evicted.
+// getAppIDs 返回当前在缓存中的应用ID的列表，确保过期的地址被驱逐出去。
 func (m *resolver) getAppIDs() []string {
 	return union(m.getAppIDsIPv4(), m.getAppIDsIPv6())
 }
@@ -554,7 +536,7 @@ func (m *resolver) nextIPv6Address(appID string) *string {
 	return nil
 }
 
-// union merges the elements from two lists into a set.
+// union 将两个列表的元素合并成一个集合
 func union(first []string, second []string) []string {
 	keys := make(map[string]struct{})
 	for _, id := range first {

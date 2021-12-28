@@ -7,8 +7,8 @@ package nameresolution
 
 // Resolver is the interface of name resolver.
 type Resolver interface {
-	// Init initializes name resolver.
+	// Init 初始化域名解析
 	Init(metadata Metadata) error
-	// ResolveID resolves name to address.
+	// ResolveID 解析域名
 	ResolveID(req ResolveRequest) (string, error)
 }

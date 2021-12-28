@@ -8,20 +8,23 @@ package kubernetes
 import (
 	"encoding/json"
 	"errors"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
+	raw_k8s "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-
-	kubeclient "github.com/dapr/components-contrib/authentication/kubernetes"
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
 )
 
 type kubernetesInput struct {
@@ -39,18 +42,32 @@ type EventResponse struct {
 
 var _ = bindings.InputBinding(&kubernetesInput{})
 
-// NewKubernetes returns a new Kubernetes event input binding.
+// NewKubernetes 返回一个新的Kubernetes事件输入绑定。
 func NewKubernetes(logger logger.Logger) bindings.InputBinding {
 	return &kubernetesInput{logger: logger}
 }
 
-func (k *kubernetesInput) Init(metadata bindings.Metadata) error {
-	client, err := kubeclient.GetKubeClient()
+// GetK8s 此处改用加载本地配置文件 ~/.kube/config
+func getK8s() *raw_k8s.Clientset {
+	conf, err := rest.InClusterConfig()
 	if err != nil {
-		return err
+		// 路径直接写死
+		conf, err = clientcmd.BuildConfigFromFlags("", filepath.Join(homedir.HomeDir(), ".kube", "config"))
+		if err != nil {
+			panic(err)
+		}
 	}
-	k.kubeClient = client
 
+	kubeClient, _ := raw_k8s.NewForConfig(conf)
+	return kubeClient
+}
+func (k *kubernetesInput) Init(metadata bindings.Metadata) error {
+	//client, err := kubeclient.GetKubeClient()
+	//if err != nil {
+	//	return err
+	//}
+	//k.kubeClient = client
+	k.kubeClient = getK8s()
 	return k.parseMetadata(metadata)
 }
 
@@ -58,7 +75,7 @@ func (k *kubernetesInput) parseMetadata(metadata bindings.Metadata) error {
 	if val, ok := metadata.Properties["namespace"]; ok && val != "" {
 		k.namespace = val
 	} else {
-		return errors.New("namespace is missing in metadata")
+		return errors.New("元数据中缺少命名空间")
 	}
 	if val, ok := metadata.Properties["resyncPeriodInSec"]; ok && val != "" {
 		intval, err := strconv.ParseInt(val, 10, 64)
