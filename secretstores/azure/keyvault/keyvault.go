@@ -43,6 +43,8 @@ func NewAzureKeyvaultSecretStore(logger logger.Logger) secretstores.SecretStore 
 	}
 }
 
+var _ secretstores.SecretStore = &keyvaultSecretStore{}
+
 // Init creates a Azure Key Vault client.
 func (k *keyvaultSecretStore) Init(metadata secretstores.Metadata) error {
 	// Fix for maintaining backwards compatibility with a change introduced in 1.3 that allowed specifying an Azure environment by setting a FQDN for vault name

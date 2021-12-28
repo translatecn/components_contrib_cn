@@ -40,6 +40,8 @@ type ssmSecretStore struct {
 	logger logger.Logger
 }
 
+var _ secretstores.SecretStore = &ssmSecretStore{}
+
 // Init creates a AWS secret manager client.
 func (s *ssmSecretStore) Init(metadata secretstores.Metadata) error {
 	meta, err := s.getSecretManagerMetadata(metadata)

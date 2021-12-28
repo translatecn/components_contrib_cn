@@ -85,6 +85,8 @@ func NewHashiCorpVaultSecretStore(logger logger.Logger) secretstores.SecretStore
 	}
 }
 
+var _ secretstores.SecretStore = &vaultSecretStore{}
+
 // Init creates a HashiCorp Vault client.
 func (v *vaultSecretStore) Init(metadata secretstores.Metadata) error {
 	props := metadata.Properties

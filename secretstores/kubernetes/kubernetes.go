@@ -61,6 +61,8 @@ func (k *kubernetesSecretStore) GetSecret(req secretstores.GetSecretRequest) (se
 	return resp, nil
 }
 
+var _ secretstores.SecretStore = &kubernetesSecretStore{}
+
 // BulkGetSecret retrieves all secrets in the store and returns a map of decrypted string/string values.
 func (k *kubernetesSecretStore) BulkGetSecret(req secretstores.BulkGetSecretRequest) (secretstores.BulkGetSecretResponse, error) {
 	resp := secretstores.BulkGetSecretResponse{

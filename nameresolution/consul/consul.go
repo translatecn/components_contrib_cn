@@ -65,6 +65,8 @@ type resolverConfig struct {
 	DaprPortMetaKey string
 }
 
+var _ nr.Resolver = &resolver{}
+
 // NewResolver creates Consul name resolver.
 func NewResolver(logger logger.Logger) nr.Resolver {
 	return newResolver(logger, resolverConfig{}, &client{})

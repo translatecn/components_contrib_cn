@@ -155,6 +155,8 @@ type resolver struct {
 	logger           logger.Logger
 }
 
+var _ nameresolution.Resolver = &resolver{}
+
 // Init registers service for mDNS.
 func (m *resolver) Init(metadata nameresolution.Metadata) error {
 	var appID string

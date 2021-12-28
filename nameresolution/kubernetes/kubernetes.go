@@ -23,7 +23,7 @@ type resolver struct {
 	clusterDomain string
 }
 
-// NewResolver creates Kubernetes name resolver.
+// NewResolver 创建Kubernetes名称解析器。
 func NewResolver(logger logger.Logger) nameresolution.Resolver {
 	return &resolver{
 		logger:        logger,
@@ -31,9 +31,11 @@ func NewResolver(logger logger.Logger) nameresolution.Resolver {
 	}
 }
 
-// Init initializes Kubernetes name resolver.
+var _ nameresolution.Resolver = &resolver{}
+
+// Init 初始化Kubernetes名称解析器。
 func (k *resolver) Init(metadata nameresolution.Metadata) error {
-	configInterface, err := config.Normalize(metadata.Configuration)
+	configInterface, err := config.Normalize(metadata.Configuration) // 数据类型转换
 	if err != nil {
 		return err
 	}
@@ -47,8 +49,8 @@ func (k *resolver) Init(metadata nameresolution.Metadata) error {
 	return nil
 }
 
-// ResolveID resolves name to address in Kubernetes.
+// ResolveID 将名字解析为Kubernetes中的地址。
 func (k *resolver) ResolveID(req nameresolution.ResolveRequest) (string, error) {
-	// Dapr requires this formatting for Kubernetes services
+	// Dapr 对于Kubernetes服务，需要这样的格式化
 	return fmt.Sprintf("%s-dapr.%s.svc.%s:%d", req.ID, req.Namespace, k.clusterDomain, req.Port), nil
 }

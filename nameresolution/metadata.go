@@ -6,28 +6,23 @@
 package nameresolution
 
 const (
-	// MDNSInstanceName is the instance name which is broadcasted.
+	// MDNSInstanceName 是被广播的实例名称。
 	MDNSInstanceName string = "name"
-	// MDNSInstanceAddress is the address of the instance.
+	// MDNSInstanceAddress 是实例的地址
 	MDNSInstanceAddress string = "address"
-	// MDNSInstancePort is the port of instance.
+	// MDNSInstancePort .是实例的端口
 	MDNSInstancePort string = "port"
-	// MDNSInstanceID is an optional unique instance ID.
+	// MDNSInstanceID 是一个可选的唯一的实例ID.
 	MDNSInstanceID string = "instance"
 
-	// HostAddress is the address of the instance.
 	HostAddress string = "HOST_ADDRESS"
-	// DaprHTTPPort is the dapr api http port.
 	DaprHTTPPort string = "DAPR_HTTP_PORT"
-	// DaprPort is the dapr internal grpc port (sidecar to sidecar).
 	DaprPort string = "DAPR_PORT"
-	// AppPort is the port of the application, http/grpc depending on mode.
 	AppPort string = "APP_PORT"
-	// AppID is the ID of the application.
 	AppID string = "APP_ID"
 )
 
-// Metadata contains a name resolution specific set of metadata properties.
+// Metadata 包含一个名称解析特定的元数据属性集。
 type Metadata struct {
 	Properties    map[string]string `json:"properties"`
 	Configuration interface{}

@@ -183,3 +183,5 @@ func (s *Store) parseSecretManagerMetadata(metadataRaw secretstores.Metadata) (*
 
 	return &meta, nil
 }
+
+var _ secretstores.SecretStore = &Store{}

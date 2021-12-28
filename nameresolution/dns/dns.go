@@ -16,6 +16,8 @@ type resolver struct {
 	logger logger.Logger
 }
 
+var _ nameresolution.Resolver = &resolver{}
+
 // NewResolver creates DNS name resolver.
 func NewResolver(logger logger.Logger) nameresolution.Resolver {
 	return &resolver{logger: logger}
