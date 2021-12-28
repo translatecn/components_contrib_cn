@@ -163,6 +163,19 @@ func (r *redisStreams) Publish(req *pubsub.PublishRequest) error {
 // ------------
 
 func (r *redisStreams) Subscribe(req pubsub.SubscribeRequest, handler pubsub.Handler) error {
+	//XGROUP CREATE mystream mygroup $ MKSTREAM
+	//XGROUP DESTROY mystream consumer-group-name
+	//上面的$表示group的offset是队列中的最后一个元素，MKSTREAM这个参数会判断stream是否存在，如果不存在会创建一个我们指定名称的stream，不加这个参数，stream不存在会报错。
+
+	//XREADGROUP GROUP mygroup Alice BLOCK 2000 COUNT 1 STREAMS mystream >
+	//		这个命令是使用消费组mygroup的Alice这个消费者从mystream这个stream中读取1条消息。
+	//		注意：
+	//		上面使用了BLOCK，表示是阻塞读取，如果读不到数据，会阻塞等待2s，不加这个条件默认是不阻塞的
+	//		">"表示只接受其他消费者没有消费过的消息
+	//		如果没有">",消费者会消费比指定id偏移量大并且没有被自己确认过的消息，这样就不用关系是否ACK过或者是否BLOCK了。
+	//XREAD是消费组读取消息，我们看下面这个命令：
+	//XREAD COUNT 2 STREAMS mystream writers 0-0 0-0XACK mystream mygroup 1526569495631-0
+	//注意：上面这个示例是从mystream和writers这2个stream中读取消息，offset都是0，COUNT参数指定了每个队列中读取的消息数量不多余2个
 	err := r.client.XGroupCreateMkStream(r.ctx, req.Topic, r.metadata.consumerID, "0").Err()
 	// Ignore BUSYGROUP errors
 	// BUSYGROUP 消费者组名称已经存在
