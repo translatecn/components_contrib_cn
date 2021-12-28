@@ -189,7 +189,7 @@ func (r *redisStreams) Subscribe(req pubsub.SubscribeRequest, handler pubsub.Han
 		return err
 	}
 
-	go r.pollNewMessagesLoop(req.Topic, handler)           // 轮询新消息的循环
+	go r.pollNewMessagesLoop(req.Topic, handler)        // 轮询新消息的循环
 	go r.reclaimPendingMessagesLoop(req.Topic, handler) // 回收待处理的信息循环
 
 	return nil
@@ -257,7 +257,7 @@ func (r *redisStreams) processMessage(msg redisMessageWrapper) error {
 		ctx, cancel = context.WithTimeout(ctx, r.metadata.processingTimeout)
 		defer cancel()
 	}
-
+	// dapr 封装的接收到订阅消息与APP交互的逻辑
 	if err := msg.handler(ctx, &msg.message); err != nil {
 		r.logger.Errorf("处理Redis信息出错 %s: %v", msg.messageID, err)
 		return err
@@ -307,21 +307,20 @@ func (r *redisStreams) pollNewMessagesLoop(stream string, handler pubsub.Handler
 	}
 }
 
-// reclaimPendingMessagesLoop periodically reclaims pending messages
-// based on the `redeliverInterval` setting.
+// reclaimPendingMessagesLoop 根据 "redeliverInterval "的设置，定期回收待发信息。     【重新交付的时间间隔】
 func (r *redisStreams) reclaimPendingMessagesLoop(stream string, handler pubsub.Handler) {
-	// Having a `processingTimeout` or `redeliverInterval` means that
-	// redelivery is disabled so we just return out of the goroutine.
+	// 有`processingTimeout`或`redeliverInterval`意味着重新交付被禁用，所以我们只是从goroutine中返回。
 	if r.metadata.processingTimeout == 0 || r.metadata.redeliverInterval == 0 {
 		return
 	}
 
-	// Do an initial reclaim call
+	// 做一个初步的回收调用
 	r.reclaimPendingMessages(stream, handler)
-
-	reclaimTicker := time.NewTicker(r.metadata.redeliverInterval)
+	// 重试单位是毫秒
+	reclaimTicker := time.NewTicker(r.metadata.redeliverInterval) // 重试时间
 
 	for {
+		fmt.Println(time.Now())
 		select {
 		case <-r.ctx.Done():
 			return
@@ -332,25 +331,23 @@ func (r *redisStreams) reclaimPendingMessagesLoop(stream string, handler pubsub.
 	}
 }
 
-// reclaimPendingMessages handles reclaiming messages that previously failed to process and
-// funneling them to the message channel by calling `enqueueMessages`.
+// reclaimPendingMessages 通过调用`enqueueMessages`，处理回收先前未能处理的消息，并将其输送到消息通道。
 func (r *redisStreams) reclaimPendingMessages(stream string, handler pubsub.Handler) {
 	for {
-		// Retrieve pending messages for this stream and consumer
+		//检索此流和customer的待处理消息 : 查询group 未确认的消息；而不是具体某个customer的消息
 		pendingResult, err := r.client.XPendingExt(r.ctx, &redis.XPendingExtArgs{
 			Stream: stream,
 			Group:  r.metadata.consumerID,
 			Start:  "-",
 			End:    "+",
 			Count:  int64(r.metadata.queueDepth),
-		}).Result()
+		}).Result() // 获取没有确认的消息列表，最大3 个
 		if err != nil && !errors.Is(err, redis.Nil) {
-			r.logger.Errorf("error retrieving pending Redis messages: %v", err)
-
+			r.logger.Errorf("检索待处理的Redis信息时出错: %v", err)
 			break
 		}
 
-		// Filter out messages that have not timed out yet
+		// 过滤掉还没有超时的信息
 		msgIDs := make([]string, 0, len(pendingResult))
 		for _, msg := range pendingResult {
 			if msg.Idle >= r.metadata.processingTimeout {
@@ -358,12 +355,12 @@ func (r *redisStreams) reclaimPendingMessages(stream string, handler pubsub.Hand
 			}
 		}
 
-		// Nothing to claim
+		// 没有什么可要求的
 		if len(msgIDs) == 0 {
 			break
 		}
 
-		// Attempt to claim the messages for the filtered IDs
+		// 使用 XCLAIM 来获得消息的所有权，并使其重新分配
 		claimResult, err := r.client.XClaim(r.ctx, &redis.XClaimArgs{
 			Stream:   stream,
 			Group:    r.metadata.consumerID,
@@ -371,21 +368,20 @@ func (r *redisStreams) reclaimPendingMessages(stream string, handler pubsub.Hand
 			MinIdle:  r.metadata.processingTimeout,
 			Messages: msgIDs,
 		}).Result()
+		//消息只有在其空闲时间大于我们通过 XCLAIM 指定的空闲时间的时才会被认领。
+		//因为作为一个副作用，XCLAIM 也会重置消息的空闲时间（因为这是处理消息的一次新尝试），
+		//两个试图同时认领消息的消费者将永远不会成功：只有一个消费者能成功认领消息。
+		//这避免了我们用微不足道的方式多次处理给定的消息（虽然一般情况下无法完全避免多次处理）。
 		if err != nil && !errors.Is(err, redis.Nil) {
-			r.logger.Errorf("error claiming pending Redis messages: %v", err)
-
+			r.logger.Errorf("错误要求待处理的Redis消息: %v", err)
 			break
 		}
 
-		// Enqueue claimed messages
+		// 这里会阻塞直至能塞入到队列里
 		r.enqueueMessages(stream, handler, claimResult)
-
-		// If the Redis nil error is returned, it means somes message in the pending
-		// state no longer exist. We need to acknowledge these messages to
-		// remove them from the pending list.
+		//如果返回Redis nil错误，这意味着某些处于待处理状态的消息不再存在。
 		if errors.Is(err, redis.Nil) {
-			// Build a set of message IDs that were not returned
-			// that potentially no longer exist.
+			// 建立一套没有返回的、可能不再存在的消息ID。
 			expectedMsgIDs := make(map[string]struct{}, len(msgIDs))
 			for _, id := range msgIDs {
 				expectedMsgIDs[id] = struct{}{}
@@ -399,10 +395,12 @@ func (r *redisStreams) reclaimPendingMessages(stream string, handler pubsub.Hand
 	}
 }
 
+// removeMessagesThatNoLongerExistFromPending `XACK`.
+// 试图单独要求信息，以便将待定列表中不再存在的信息从待定列表中删除。这可以通过调用
 // removeMessagesThatNoLongerExistFromPending attempts to claim messages individually so that messages in the pending list
 // that no longer exist can be removed from the pending list. This is done by calling `XACK`.
 func (r *redisStreams) removeMessagesThatNoLongerExistFromPending(stream string, messageIDs map[string]struct{}, handler pubsub.Handler) {
-	// Check each message ID individually.
+	// 单独检查每个信息ID。
 	for pendingID := range messageIDs {
 		claimResultSingleMsg, err := r.client.XClaim(r.ctx, &redis.XClaimArgs{
 			Stream:   stream,
@@ -412,18 +410,18 @@ func (r *redisStreams) removeMessagesThatNoLongerExistFromPending(stream string,
 			Messages: []string{pendingID},
 		}).Result()
 		if err != nil && !errors.Is(err, redis.Nil) {
-			r.logger.Errorf("error claiming pending Redis message %s: %v", pendingID, err)
+			r.logger.Errorf("错误声称待处理的Redis信息 %s: %v", pendingID, err)
 
 			continue
 		}
 
-		// Ack the message to remove it from the pending list.
+		// 确认该信息，将其从待处理列表中删除。
 		if errors.Is(err, redis.Nil) {
 			if err = r.client.XAck(r.ctx, stream, r.metadata.consumerID, pendingID).Err(); err != nil {
 				r.logger.Errorf("error acknowledging Redis message %s after failed claim for %s: %v", pendingID, stream, err)
 			}
 		} else {
-			// This should not happen but if it does the message should be processed.
+			// 这种情况不应该发生，但如果发生了，信息应该被处理。
 			r.enqueueMessages(stream, handler, claimResultSingleMsg)
 		}
 	}
