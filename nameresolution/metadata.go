@@ -6,11 +6,11 @@
 package nameresolution
 
 const (
-	// MDNSInstanceName 是被广播的实例名称。
+	// MDNSInstanceName 是被广播的应用名称。
 	MDNSInstanceName string = "name"
-	// MDNSInstanceAddress 是实例的地址
+	// MDNSInstanceAddress 是实例的地址,本机地址
 	MDNSInstanceAddress string = "address"
-	// MDNSInstancePort .是实例的端口
+	// MDNSInstancePort .是实例的端口   daprd内部通信的端口
 	MDNSInstancePort string = "port"
 	// MDNSInstanceID 是一个可选的唯一的实例ID.
 	MDNSInstanceID string = "instance"

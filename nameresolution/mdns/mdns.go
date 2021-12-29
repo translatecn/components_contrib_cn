@@ -33,7 +33,7 @@ const (
 	refreshInterval = time.Second * 30
 	// addressTTL 域名解析的有效时长
 	addressTTL = time.Second * 60
-	// max integer value supported on this architecture.
+	// 这个架构上支持的最大整数值。
 	maxInt = int(^uint(0) >> 1)
 )
 
@@ -70,7 +70,7 @@ func (a *addressList) expire() {
 func (a *addressList) add(ip string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-
+	// 如果该地址已经存在，则刷新过期时间
 	for i := range a.addresses {
 		if a.addresses[i].ip == ip {
 			a.addresses[i].expiresAt = time.Now().Add(addressTTL)
@@ -78,16 +78,14 @@ func (a *addressList) add(ip string) {
 			return
 		}
 	}
+	// 不存在，则添加
 	a.addresses = append(a.addresses, address{
 		ip:        ip,
 		expiresAt: time.Now().Add(addressTTL),
 	})
 }
 
-// next gets the next address from the list given
-// the current round robin implementation.
-// There are no guarantees on the selection
-// beyond best effort linear iteration.
+// next 从列表中获取下一个地址，考虑到当前的轮回实现。除了尽力而为的线性迭代，对选择没有任何保证。
 func (a *addressList) next() *string {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -97,6 +95,7 @@ func (a *addressList) next() *string {
 	}
 
 	if a.counter == maxInt {
+		// 防止溢出
 		a.counter = 0
 	}
 	index := a.counter % len(a.addresses)
@@ -149,7 +148,7 @@ type resolver struct {
 
 var _ nameresolution.Resolver = &resolver{}
 
-// Init registers service for mDNS.
+// Init 注册mdns服务
 func (m *resolver) Init(metadata nameresolution.Metadata) error {
 	var appID string
 	var hostAddress string
@@ -187,6 +186,7 @@ func (m *resolver) Init(metadata nameresolution.Metadata) error {
 	return err
 }
 
+// 相当于是启动了mdns的服务端
 func (m *resolver) registerMDNS(instanceID string, appID string, ips []string, port int) error {
 	started := make(chan bool, 1)
 	var err error
@@ -197,26 +197,28 @@ func (m *resolver) registerMDNS(instanceID string, appID string, ips []string, p
 		host, _ := os.Hostname()
 		info := []string{appID}
 
-		// default instance id is unique to the process.
+		// 默认的实例ID对于进程来说是唯一的。
 		if instanceID == "" {
 			instanceID = fmt.Sprintf("%s-%d", host, syscall.Getpid())
 		}
 
 		if len(ips) > 0 {
+			// 注册一个服务代理。这个调用将跳过主机名/IP查找，并使用提供的值。
 			server, err = zeroconf.RegisterProxy(instanceID, appID, "local.", port, host, ips, info, nil)
 		} else {
+			// 一个服务的给定参数。这个调用将获取系统的主机名并通过该主机名查找IP。
 			server, err = zeroconf.Register(instanceID, appID, "local.", port, info, nil)
 		}
 
 		if err != nil {
 			started <- false
-			m.logger.Errorf("error from zeroconf register: %s", err)
+			m.logger.Errorf("注册 zeroconf 错误: %s", err)
 
 			return
 		}
 		started <- true
 
-		// Wait until it gets SIGTERM event.
+		// 等待,直到收到SIGTERM事件.
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 		<-sig
@@ -229,70 +231,62 @@ func (m *resolver) registerMDNS(instanceID string, appID string, ips []string, p
 	return err
 }
 
-// ResolveID resolves name to address via mDNS.
+// ResolveID 通过mDNS将名称解析为地址。
 func (m *resolver) ResolveID(req nameresolution.ResolveRequest) (string, error) {
-	// check for cached IPv4 addresses for this app id first.
+	// 首先检查这个应用程序ID的缓存IPv4地址。
 	if addr := m.nextIPv4Address(req.ID); addr != nil {
 		return *addr, nil
 	}
 
-	// check for cached IPv6 addresses for this app id second.
+	// 首先检查这个应用程序ID的缓存IPv6地址
 	if addr := m.nextIPv6Address(req.ID); addr != nil {
 		return *addr, nil
 	}
 
-	// cache miss, fallback to browsing the network for addresses.
-	m.logger.Debugf("no mDNS address found in cache, browsing network for app id %s", req.ID)
+	// 缓存缺失，则退回到浏览网络寻找地址。
+	m.logger.Debugf("缓存中没有找到mDNS地址，浏览网络的应用ID %s", req.ID)
 
-	// get the first address we receive...
+	// 得到我们收到的第一个地址...
 	addr, err := m.browseFirstOnly(context.Background(), req.ID)
 	if err == nil {
-		// ...and trigger a background refresh for any additional addresses.
+		// 触发后台刷新
 		m.refreshChan <- req.ID
 	}
 
 	return addr, err
 }
 
-// browseFirstOnly will perform a mDNS network browse for an address
-// matching the provided app id. It will return the first address it
-// receives and stop browsing for any more.
+// browseFirstOnly 将执行一次mDNS网络浏览，寻找与所提供的应用程序ID相匹配的地址。它将返回它收到的第一个地址，并停止浏览任何其他地址。
 func (m *resolver) browseFirstOnly(ctx context.Context, appID string) (string, error) {
 	var addr string
 
-	ctx, cancel := context.WithTimeout(ctx, firstOnlyTimeout)
+	ctx, cancel := context.WithTimeout(ctx, firstOnlyTimeout) // 1秒
 	defer cancel()
 
-	// onFirst will be invoked on the first address received.
-	// Due to the asynchronous nature of cancel() there
-	// is no guarantee that this will ONLY be invoked on the
-	// first address. Ensure that multiple invocations of this
-	// function are safe.
+	//onFirst将在收到的第一个地址上被调用。由于cancel()的异步性，不能保证它只在第一个地址上被调用。确保这个函数的多次调用是安全的。
 	onFirst := func(ip string) {
 		addr = ip
-		cancel() // cancel to stop browsing.
+		cancel() // 停止browse
 	}
 
-	m.logger.Debugf("Browsing for first mDNS address for app id %s", appID)
+	m.logger.Debugf("浏览应用程序ID的第一个mDNS地址 %s", appID)
 
 	err := m.browse(ctx, appID, onFirst)
 	if err != nil {
 		return "", err
 	}
 
-	// wait for the context to be canceled or time out.
+	// 等到上下文被取消或超时。
 	<-ctx.Done()
 
 	if errors.Is(ctx.Err(), context.Canceled) {
-		// expect this when we've found an address and canceled the browse.
-		m.logger.Debugf("Browsing for first mDNS address for app id %s canceled.", appID)
+		m.logger.Debugf("取消了对应用程序id %s的第一个mDNS地址的浏览。", appID)
 	} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		// expect this when we've been unable to find the first address before the timeout.
-		m.logger.Debugf("Browsing for first mDNS address for app id %s timed out.", appID)
+		m.logger.Debugf("对应用程序id %s的第一个mDNS地址的浏览 超时了。", appID)
 	}
 
 	if addr == "" {
-		return "", fmt.Errorf("couldn't find service: %s", appID)
+		return "", fmt.Errorf("不能发现服务地址: %s", appID)
 	}
 
 	return addr, nil
@@ -384,9 +378,9 @@ func (m *resolver) browse(ctx context.Context, appID string, onEach func(ip stri
 			select {
 			case <-ctx.Done():
 				if errors.Is(ctx.Err(), context.Canceled) {
-					m.logger.Debugf("mDNS browse for app id %s canceled.", appID)
+					m.logger.Debugf("应用%s的mDNS查找取消了.", appID)
 				} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-					m.logger.Debugf("mDNS browse for app id %s timed out.", appID)
+					m.logger.Debugf("应用%s的mDNS查找超时了.", appID)
 				}
 				return
 			case entry := <-results:
@@ -395,14 +389,14 @@ func (m *resolver) browse(ctx context.Context, appID string, onEach func(ip stri
 				}
 				for _, text := range entry.Text {
 					if text != appID {
-						m.logger.Debugf("mDNS response doesn't match app id %s, skipping.", appID)
+						m.logger.Debugf("mDNS响应没有匹配到应用 id %s, 跳过.", appID)
 						break
 					}
-					m.logger.Debugf("mDNS response for app id %s received.", appID)
+					m.logger.Debugf("mDNS 响应匹配到了应用ID %s.", appID)
 					hasIPv4Address := len(entry.AddrIPv4) > 0
 					hasIPv6Address := len(entry.AddrIPv6) > 0
 					if !hasIPv4Address && !hasIPv6Address {
-						m.logger.Debugf("mDNS response for app id %s doesn't contain any IPv4 or IPv6 addresses, skipping.", appID)
+						m.logger.Debugf("应用 %s的mDNS 响应不包含任何ipv4|ipv6地址，跳过", appID)
 						break
 					}
 
@@ -435,13 +429,12 @@ func (m *resolver) browse(ctx context.Context, appID string, onEach func(ip stri
 	return nil
 }
 
-// addAppAddressIPv4 adds an IPv4 address to the
-// cache for the provided app id.
+// addAppAddressIPv4 为所提供的应用程序ID添加一个IPv4地址到缓存中。
 func (m *resolver) addAppAddressIPv4(appID string, addr string) {
 	m.ipv4Mu.Lock()
 	defer m.ipv4Mu.Unlock()
 
-	m.logger.Debugf("Adding IPv4 address %s for app id %s cache entry.", addr, appID)
+	m.logger.Debugf("添加app:%s 实例地址:%s 到ipv4缓存中", addr, appID)
 	if _, ok := m.appAddressesIPv4[appID]; !ok {
 		var addrList addressList
 		m.appAddressesIPv4[appID] = &addrList
@@ -449,13 +442,12 @@ func (m *resolver) addAppAddressIPv4(appID string, addr string) {
 	m.appAddressesIPv4[appID].add(addr)
 }
 
-// addAppIPv4Address adds an IPv6 address to the
-// cache for the provided app id.
+// addAppIPv4Address 为所提供的应用程序ID添加一个IPv6地址到缓存中。
 func (m *resolver) addAppAddressIPv6(appID string, addr string) {
 	m.ipv6Mu.Lock()
 	defer m.ipv6Mu.Unlock()
 
-	m.logger.Debugf("Adding IPv6 address %s for app id %s cache entry.", addr, appID)
+	m.logger.Debugf("添加app:%s 实例地址:%s 到ipv6缓存中", addr, appID)
 	if _, ok := m.appAddressesIPv6[appID]; !ok {
 		var addrList addressList
 		m.appAddressesIPv6[appID] = &addrList
@@ -500,8 +492,7 @@ func (m *resolver) getAppIDs() []string {
 	return union(m.getAppIDsIPv4(), m.getAppIDsIPv6())
 }
 
-// nextIPv4Address returns the next IPv4 address for
-// the provided app id from the cache.
+// nextIPv4Address 从缓存中返回所提供的应用程序ID的下一个IPv4地址。
 func (m *resolver) nextIPv4Address(appID string) *string {
 	m.ipv4Mu.RLock()
 	defer m.ipv4Mu.RUnlock()
@@ -509,7 +500,7 @@ func (m *resolver) nextIPv4Address(appID string) *string {
 	if exists {
 		addr := addrList.next()
 		if addr != nil {
-			m.logger.Debugf("found mDNS IPv4 address in cache: %s", *addr)
+			m.logger.Debugf("再缓存中发现 mDNS IPv4 地址: %s", *addr)
 
 			return addr
 		}
@@ -518,8 +509,7 @@ func (m *resolver) nextIPv4Address(appID string) *string {
 	return nil
 }
 
-// nextIPv6Address returns the next IPv6 address for
-// the provided app id from the cache.
+// nextIPv6Address 从缓存中返回所提供的应用程序ID的下一个IPv6地址。
 func (m *resolver) nextIPv6Address(appID string) *string {
 	m.ipv6Mu.RLock()
 	defer m.ipv6Mu.RUnlock()
@@ -527,8 +517,7 @@ func (m *resolver) nextIPv6Address(appID string) *string {
 	if exists {
 		addr := addrList.next()
 		if addr != nil {
-			m.logger.Debugf("found mDNS IPv6 address in cache: %s", *addr)
-
+			m.logger.Debugf("再缓存中发现 mDNS IPv4 地址:  %s", *addr)
 			return addr
 		}
 	}
