@@ -5,10 +5,10 @@
 
 package bindings
 
-// InputBinding is the interface to define a binding that triggers on incoming events.
+// InputBinding 是定义一个在传入事件上触发的绑定的接口。
 type InputBinding interface {
-	// Init passes connection and properties metadata to the binding implementation
+	// Init 将连接和属性元数据传递给绑定实现
 	Init(metadata Metadata) error
-	// Read is a blocking method that triggers the callback function whenever an event arrives
+	// Read 是一个阻塞方法，每当有事件发生时就会触发回调函数。
 	Read(handler func(*ReadResponse) ([]byte, error)) error
 }

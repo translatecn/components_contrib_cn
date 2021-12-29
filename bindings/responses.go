@@ -9,13 +9,13 @@ import (
 	"github.com/dapr/components-contrib/state"
 )
 
-// ReadResponse is the return object from an dapr input binding.
+// ReadResponse 是来自dapr输入绑定的返回对象。
 type ReadResponse struct {
 	Data     []byte            `json:"data"`
 	Metadata map[string]string `json:"metadata"`
 }
 
-// AppResponse is the object describing the response from user code after a bindings event.
+// AppResponse 是描述用户代码在绑定事件后的响应的对象。
 type AppResponse struct {
 	Data        interface{}        `json:"data"`
 	To          []string           `json:"to"`
@@ -24,7 +24,7 @@ type AppResponse struct {
 	Concurrency string             `json:"concurrency"`
 }
 
-// InvokeResponse is the response object returned from an output binding.
+// InvokeResponse 是从输出绑定返回的响应对象。
 type InvokeResponse struct {
 	Data     []byte            `json:"data"`
 	Metadata map[string]string `json:"metadata"`

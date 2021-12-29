@@ -10,17 +10,17 @@ import (
 	"strconv"
 )
 
-// InvokeRequest is the object given to a dapr output binding.
+// InvokeRequest dapr 输出绑定 传递的请求对象
 type InvokeRequest struct {
 	Data      []byte            `json:"data"`
 	Metadata  map[string]string `json:"metadata"`
 	Operation OperationKind     `json:"operation"`
 }
 
-// OperationKind defines an output binding operation.
+// OperationKind 定义了输出绑定的操作类型
 type OperationKind string
 
-// Non exhaustive list of operations. A binding can add operations that are not in this list.
+// 非详尽的操作列表。绑定可以添加不在此列表中的操作。
 const (
 	GetOperation    OperationKind = "get"
 	CreateOperation OperationKind = "create"

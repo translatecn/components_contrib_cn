@@ -74,7 +74,6 @@ func (a *addressList) add(ip string) {
 	for i := range a.addresses {
 		if a.addresses[i].ip == ip {
 			a.addresses[i].expiresAt = time.Now().Add(addressTTL)
-
 			return
 		}
 	}

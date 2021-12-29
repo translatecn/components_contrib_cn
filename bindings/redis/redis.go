@@ -27,12 +27,12 @@ type Redis struct {
 	cancel context.CancelFunc
 }
 
-// NewRedis returns a new redis bindings instance.
+// NewRedis 返回Redis绑定
 func NewRedis(logger logger.Logger) *Redis {
 	return &Redis{logger: logger}
 }
 
-// Init performs metadata parsing and connection creation.
+// Init 执行元数据解析和连接创建。
 func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.client, r.clientSettings, err = rediscomponent.ParseClientFromProperties(meta.Properties, nil)
 	if err != nil {
@@ -43,12 +43,13 @@ func (r *Redis) Init(meta bindings.Metadata) (err error) {
 
 	_, err = r.client.Ping(r.ctx).Result()
 	if err != nil {
-		return fmt.Errorf("redis binding: error connecting to redis at %s: %s", r.clientSettings.Host, err)
+		return fmt.Errorf("redis binding:连接redis失败 %s: %s", r.clientSettings.Host, err)
 	}
 
 	return err
 }
 
+// Operations 返回支持的操作类型
 func (r *Redis) Operations() []bindings.OperationKind {
 	return []bindings.OperationKind{bindings.CreateOperation}
 }
@@ -64,7 +65,7 @@ func (r *Redis) Invoke(req *bindings.InvokeRequest) (*bindings.InvokeResponse, e
 		return nil, nil
 	}
 
-	return nil, errors.New("redis binding: missing key on write request metadata")
+	return nil, errors.New("redis binding: 写入请求元数据的键丢失")
 }
 
 func (r *Redis) Close() error {
@@ -72,3 +73,6 @@ func (r *Redis) Close() error {
 
 	return r.client.Close()
 }
+
+//var _ bindings.InputBinding= &Redis{} 没有实现
+var _ bindings.OutputBinding = &Redis{}

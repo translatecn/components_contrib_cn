@@ -5,8 +5,8 @@
 
 package bindings
 
-// Metadata represents a set of binding specific properties.
+// Metadata 代表了一组绑定的具体属性。
 type Metadata struct {
-	Name       string
+	Name       string // 组件的名称
 	Properties map[string]string `json:"properties"`
 }
