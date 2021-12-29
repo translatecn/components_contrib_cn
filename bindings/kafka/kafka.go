@@ -61,6 +61,7 @@ type consumer struct {
 // ConsumeClaim 消费消息
 func (consumer *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for message := range claim.Messages() {
+		// ./kafka-console-producer.sh --broker-list localhost:9092 --topic topic-a
 		if consumer.callback != nil {
 			_, err := consumer.callback(&bindings.ReadResponse{
 				Data: message.Value,
