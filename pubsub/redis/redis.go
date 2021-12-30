@@ -320,7 +320,6 @@ func (r *redisStreams) reclaimPendingMessagesLoop(stream string, handler pubsub.
 	reclaimTicker := time.NewTicker(r.metadata.redeliverInterval) // 重试时间
 
 	for {
-		fmt.Println(time.Now())
 		select {
 		case <-r.ctx.Done():
 			return

@@ -6,16 +6,16 @@
 package state
 
 const (
-	// FeatureETag is the feature to etag metadata in state store.
+	// FeatureETag 是在状态存储中对元数据进行标记的功能。
 	FeatureETag Feature = "ETAG"
-	// FeatureTransactional is the feature that performs transactional operations.
+	// FeatureTransactional 是执行事务性操作的功能。
 	FeatureTransactional Feature = "TRANSACTIONAL"
 )
 
-// Feature names a feature that can be implemented by PubSub components.
+// Feature 命名一个可以由PubSub组件实现的功能。
 type Feature string
 
-// IsPresent checks if a given feature is present in the list.
+// IsPresent 检查一个给定的特征是否在列表中存在。
 func (f Feature) IsPresent(features []Feature) bool {
 	for _, feature := range features {
 		if feature == f {
